@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
 	pid_t wait_result;
 	char* line;
 #ifdef GS
-    rl_outstream = fopen("/dev/null", "w");
+    rl_outstream = fopen("/dev/null", "w");d
 #endif
 
     // check command line arg
