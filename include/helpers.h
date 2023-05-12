@@ -30,7 +30,7 @@ list_t* CreateList()
 
 }
 
-void InsertAtHead(list_t* list, node_t* newNode) {
+void InsertNodeAtHead(list_t* list, node_t* newNode) {
     if(list == NULL || newNode == NULL)
         return;
     if (list->length == 0) 
@@ -48,6 +48,29 @@ void InsertAtHead(list_t* list, node_t* newNode) {
     *head = new_node;
     list->length++;
 }
+
+
+void InsertNodeAtTail(list_t* list, node_t* newNode) {
+    if (list == NULL || newNode == NULL)
+        return;
+    if (list->length == 0) {
+        InsertNodeAtHead(list, newNode);
+        return;
+    }
+
+    node_t* head = list->head;
+    node_t* current = head;
+    while (current->next != NULL) {
+        current = current->next;
+    }
+
+    current->next = malloc(sizeof(node_t));
+    current->next->bgentry = newNode->bgentry;
+    current->next->next = NULL;
+    list->length++;
+}
+
+
 
 void PrintLinkedList(list_t* list, FILE* fp) {
     if(list == NULL)
@@ -83,4 +106,19 @@ node_t* RemoveByPid(node_t** head, pid_t pid) {
     }
 
     return NULL;
+}
+
+node_t* RemoveFromHead(node_t** head) {
+    node_t* removed_node = NULL;
+
+    // Check if the list is empty
+    if (*head == NULL) {
+        return NULL;
+    }
+
+    // Remove the node from the head of the list
+    removed_node = *head;
+    *head = (*head)->next;
+
+    return removed_node;
 }

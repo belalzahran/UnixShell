@@ -14,8 +14,8 @@ CFLAGS := -DCOLOR $(INC)
 all: setup
 	$(CC) $(CFLAGS) $(LIB) $(SRC) -o bin/53shell -lreadline
 
-debug: setup
-	$(CC) $(DFLAGS) $(CFLAGS) $(LIB) $(SRC) -o bin/53shell -lreadline
+ debug: setup
+	 $(CC) $(DFLAGS) $(CFLAGS) $(LIB) $(SRC) -o bin/53shell -lreadline
 
 setup:
 	mkdir -p bin

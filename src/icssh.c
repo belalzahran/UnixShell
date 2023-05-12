@@ -24,7 +24,8 @@ int main(int argc, char* argv[])
 	pid_t pid;
 	pid_t wait_result;
 	char* line;
-	list_t* bgJobList = CreateList();
+	list_t* bgJobListOldest = CreateList();
+	list_t* bgJobListNewest = CreateList();
 	struct sigaction sa;
 	sa.sa_handler = sigchld_handler;
 	sigemptyset(&sa.sa_mask);
@@ -69,16 +70,18 @@ int main(int argc, char* argv[])
 
 			while((pid = waitpid(-1, &status, WNOHANG)) > 0)
 			{
-				node_t* curr = RemoveByPid(&bgJobList->head,pid);
-				if (curr == NULL)
+				node_t* curr = RemoveByPid(&bgJobListOldest->head,pid);
+				node_t* curr2 = RemoveByPid(&bgJobListNewest->head,pid);
+				if (curr == NULL || curr2 == NULL)
 				{
 					perror("removing node failure\n");
 					exit(EXIT_FAILURE);
 				}
 				else
 				{
-					bgJobList->length--;
-					printf(BG_TERM, pid, curr->bgentry->job->procs->cmd);
+					bgJobListOldest->length--;
+					bgJobListNewest->length--;
+					printf(BG_TERM, pid, curr->bgentry->job->line);
 
 
 				}
@@ -114,17 +117,100 @@ int main(int argc, char* argv[])
 		if (strcmp(job->procs->cmd, "estatus") == 0)
 		{
 			printf("%d\n", last_exit_status);
-			free_job;
+			free_job(job);
 			free(line);
 			continue;
 		}
 
-		if (strcmp(job->procs->cmd, "bg") == 0)
+		if (strcmp(job->procs->cmd, "bglist") == 0)
 		{
-			printf("Printing Linked List of length: %d\n",bgJobList->length);
-			PrintLinkedList(bgJobList,stdout);
+			// printf("Printing Linked List of length: %d\n",bgJobList->length);
+			// printf("Oldest:\n");
+			if (bgJobListOldest->length == 0)
+			{
+				fprintf(stderr,"ERROR: No Background Processes\n");
+				last_exit_status = 1;
+			}
+			else
+			{
+				PrintLinkedList(bgJobListOldest,stderr);
+				last_exit_status = 0;
+
+			}
+			// printf("\n\n");
+			// printf("Newest\n");
+			
+			// PrintLinkedList(bgJobListNewest,stderr);
+
 			continue;
 		}
+
+		if (strcmp(job->procs->cmd, "fg") == 0)
+		{
+			node_t* temp;
+
+			if (bgJobListNewest->length == 0 || bgJobListOldest->length == 0)
+			{
+				fprintf(stderr,"%s",PID_ERR);
+				last_exit_status = 1;
+			}
+			else
+			{
+
+				if (job->procs->argc > 1)
+				{
+				
+					pid_t myPid = atoi(job->procs->argv[1]);
+					temp = RemoveByPid(&bgJobListOldest->head,myPid);
+				
+					// check to see if the pid exist and remove or print error
+					if(temp != NULL)
+					{
+						// desired pid successfully removed
+						RemoveByPid(&bgJobListNewest->head,myPid);
+						bgJobListNewest->length--;
+						bgJobListOldest->length--;
+						printf("%s\n",temp->bgentry->job->line);
+					}
+					else
+					{
+						fprintf(stderr,"%s",PID_ERR);
+						last_exit_status = 1;
+					}
+				
+					
+				}
+				else if (job->procs->argc == 1)
+				{	
+					temp = RemoveFromHead(&bgJobListNewest->head);
+
+					if(temp != NULL)
+					{
+						// remove the newest background job
+						RemoveByPid(&bgJobListOldest->head,temp->bgentry->pid);
+						printf("%s\n",temp->bgentry->job->line);
+						bgJobListNewest->length--;
+						bgJobListOldest->length--;
+					}
+					else
+					{
+						fprintf(stderr,"%s",PID_ERR);
+						last_exit_status = 1;
+					}
+				
+						
+		
+				}
+
+			}
+
+			free_job(job);
+			free(line);
+			continue;
+
+		}
+
+
 
 		if (strcmp(job->procs->cmd, "cd") == 0)
 		{
@@ -190,11 +276,11 @@ int main(int argc, char* argv[])
 		else 
 		{		// As the parent, wait for the foreground job to finish
 
-			if (job->bg && bgJobList->length == max_bgprocs)
+			if (job->bg && bgJobListOldest->length == max_bgprocs)
 			{
 				free_job(job);
 				free(line);
-				fprintf(stderr,"%s\n",BG_ERR);
+				fprintf(stderr,"%s",BG_ERR);
 				continue;
 			}
 			else if (job->bg)
@@ -213,7 +299,8 @@ int main(int argc, char* argv[])
 				newbgentry->pid = pid;
 				newbgentry->seconds = time(NULL);
 
-				InsertAtHead(bgJobList,newNode);
+				InsertNodeAtTail(bgJobListOldest,newNode);
+				InsertNodeAtHead(bgJobListNewest,newNode);
 				continue;
 				
 			}
