@@ -125,7 +125,6 @@ int main(int argc, char* argv[])
 
 				if (node != NULL) 
 				{
-					free(node->bgentry->job->line);
 					free_job(node->bgentry->job);
 					free(node->bgentry);
 					free(node);
