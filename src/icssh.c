@@ -1,7 +1,7 @@
 #include "icssh.h"
-#include <readline/readline.h>
 #include "helpers.h"
-#include <signal.h>
+#include <readline/readline.h>
+
 
 volatile sig_atomic_t childTerminated = 0;
 
@@ -35,7 +35,7 @@ int main(int argc, char* argv[])
 		perror("sigaction\n");
 		exit(EXIT_FAILURE);
 	}
-
+	  
 
 #ifdef GS
     rl_outstream = fopen("/dev/null", "w");
@@ -58,6 +58,8 @@ int main(int argc, char* argv[])
 		perror("Failed to set signal handler");
 		exit(EXIT_FAILURE);
 	}
+  	signal(SIGUSR2, print_date_and_time);
+
 
     	// print the prompt & wait for the user to enter commands string
 	while ((line = readline(SHELL_PROMPT)) != NULL) 
@@ -104,14 +106,37 @@ int main(int argc, char* argv[])
 				debug_print_job(job);
 		#endif
 
-		// example built-in: exit
+		
 		if (strcmp(job->procs->cmd, "exit") == 0) 
 		{
-			// Terminating the shell
+			node_t* node;
+			while ((node = RemoveFromHead(&bgJobListOldest->head)) != NULL)
+			{
+				if (kill(node->bgentry->pid, SIGTERM) == -1)
+				{
+					perror("kill");
+				}
+				else
+				{
+					int status;
+					waitpid(node->bgentry->pid, &status, 0);
+					printf(BG_TERM, (int)node->bgentry->pid, node->bgentry->job->line);
+				}
+
+				if (node != NULL) 
+				{
+					free(node->bgentry->job->line);
+					free_job(node->bgentry->job);
+					free(node->bgentry);
+					free(node);
+				}
+			}
+
+			// After all background processes have been killed, exit the shell.
 			free(line);
 			free_job(job);
-            validate_input(NULL);   // calling validate_input with NULL will free the memory it has allocated
-            return 0;
+			validate_input(NULL);   // calling validate_input with NULL will free the memory it has allocated
+			return 0;
 		}
 
 		if (strcmp(job->procs->cmd, "estatus") == 0)
@@ -209,8 +234,6 @@ int main(int argc, char* argv[])
 			continue;
 
 		}
-
-
 
 		if (strcmp(job->procs->cmd, "cd") == 0)
 		{
