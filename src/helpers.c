@@ -105,14 +105,14 @@ node_t* RemoveFromHead(node_t** head) {
 
 void print_date_and_time(int signum) {
     time_t rawtime;
-    struct tm * timeinfo;
+    struct tm* timeinfo;
     char buffer[80];
 
-    time ( &rawtime );
-    timeinfo = localtime ( &rawtime );
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
 
     // Format the timeinfo structure into a string.
-    strftime(buffer, 80, "%a %b %d %H:%M:%S %Y", timeinfo);
+    strftime(buffer, sizeof(buffer), "%a %b %d %H:%M:%S %Y", timeinfo);
 
-    printf("Current local time and date: %s\n", buffer);
+    fprintf(stderr, "Current local time and date: %s\n", buffer);
 }

@@ -10,6 +10,10 @@ void sigchld_handler(int signum)
     childTerminated = 1;
 }
 
+void handle_sigint(int sig) 
+{
+}
+
 int last_exit_status = 0;
 
 
@@ -32,7 +36,7 @@ int main(int argc, char* argv[])
 	sa.sa_flags = SA_RESTART;
 	if (sigaction(SIGCHLD, &sa, NULL) == -1)
 	{
-		perror("sigaction\n");
+		//perror("sigaction\n");
 		exit(EXIT_FAILURE);
 	}
 	  
@@ -47,7 +51,7 @@ int main(int argc, char* argv[])
         if(check != 0)
             max_bgprocs = check;
         else {
-            printf("Invalid command line argument value\n");
+            // printf("Invalid command line argument value\n");
             exit(EXIT_FAILURE);
         }
     }
@@ -55,10 +59,11 @@ int main(int argc, char* argv[])
 	// Setup segmentation fault handler
 	if (signal(SIGSEGV, sigsegv_handler) == SIG_ERR) 
 	{
-		perror("Failed to set signal handler");
+		// perror("Failed to set signal handler");
 		exit(EXIT_FAILURE);
 	}
   	signal(SIGUSR2, print_date_and_time);
+	signal(SIGINT, handle_sigint);
 
 
     	// print the prompt & wait for the user to enter commands string
@@ -76,7 +81,7 @@ int main(int argc, char* argv[])
 				node_t* curr2 = RemoveByPid(&bgJobListNewest->head,pid);
 				if (curr == NULL || curr2 == NULL)
 				{
-					perror("removing node failure\n");
+					// perror("removing node failure\n");
 					exit(EXIT_FAILURE);
 				}
 				else
@@ -114,7 +119,7 @@ int main(int argc, char* argv[])
 			{
 				if (kill(node->bgentry->pid, SIGTERM) == -1)
 				{
-					perror("kill");
+					// perror("kill");
 				}
 				else
 				{
@@ -152,7 +157,7 @@ int main(int argc, char* argv[])
 			// printf("Oldest:\n");
 			if (bgJobListOldest->length == 0)
 			{
-				fprintf(stderr,"ERROR: No Background Processes\n");
+				// fprintf(stderr,"ERROR: No Background Processes\n");
 				last_exit_status = 1;
 			}
 			else
@@ -280,20 +285,97 @@ int main(int argc, char* argv[])
 		}
 		if (pid == 0) 
 		{  //If zero, then it's the child process
-            //get the first command in the job list to execute
-		    proc_info* proc = job->procs;
+			proc_info* proc = job->procs;
+
+	
+			if (job->in_file != NULL && job->out_file != NULL && strcmp(job->in_file, job->out_file) == 0) 
+			{
+				fprintf(stderr, "%s",RD_ERR);
+				exit(EXIT_FAILURE);
+			}
+
+			while(proc != NULL) 
+			{
+				if (proc->err_file != NULL) 
+				{
+					if (job->in_file != NULL && strcmp(job->in_file, proc->err_file) == 0) {
+						fprintf(stderr, "%s",RD_ERR);
+						exit(EXIT_FAILURE);
+					}
+
+					if (job->out_file != NULL && strcmp(job->out_file, proc->err_file) == 0) {
+						fprintf(stderr, "%s",RD_ERR);
+						exit(EXIT_FAILURE);
+					}
+				}
+				proc = proc->next_proc;
+			}
+			proc = job->procs;
+
+			// Input redirection
+			if (job->in_file != NULL ) 
+			{
+				int infd = open(job->in_file, O_RDONLY);
+				if (infd < 0) {
+					fprintf(stderr,"%s", RD_ERR);
+					exit(EXIT_FAILURE);
+				}
+
+				if (dup2(infd, STDIN_FILENO) < 0) {
+					perror("dup2 input file error");
+					exit(EXIT_FAILURE);
+				}
+
+				close(infd);  // Close the file descriptor as it's no longer needed
+			}
+
+			// Output redirection
+			if (job->out_file != NULL ) 
+			{
+				int outfd = open(job->out_file, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+				if (outfd < 0) {
+					perror("open output file error");
+					exit(EXIT_FAILURE);
+				}
+
+				if (dup2(outfd, STDOUT_FILENO) < 0) {
+					perror("dup2 output file error");
+					exit(EXIT_FAILURE);
+				}
+
+				close(outfd);  // Close the file descriptor as it's no longer needed
+			}
+
+			if (proc->err_file != NULL) 
+			{
+				int errfd = open(proc->err_file, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+				if (errfd < 0) {
+					perror("open error file error");
+					exit(EXIT_FAILURE);
+				}
+				if (dup2(errfd, STDERR_FILENO) < 0) {
+					perror("dup2 error file error");
+					exit(EXIT_FAILURE);
+				}
+				close(errfd);  // Close the file descriptor as it's no longer needed
+    		}
+
+
 			exec_result = execvp(proc->cmd, proc->argv);
-			if (exec_result < 0) {  //Error checking
+
+			if (exec_result < 0) 
+			{  //Error checking
 				printf(EXEC_ERR, proc->cmd);
-				
+
 				// Cleaning up to make Valgrind happy 
 				// (not necessary because child will exit. Resources will be reaped by parent)
 				free_job(job);  
 				free(line);
-    				validate_input(NULL);  // calling validate_input with NULL will free the memory it has allocated
+				validate_input(NULL);  // calling validate_input with NULL will free the memory it has allocated
 
 				exit(EXIT_FAILURE);
 			}
+
 		} 
 		else 
 		{		// As the parent, wait for the foreground job to finish
@@ -341,7 +423,7 @@ int main(int argc, char* argv[])
 					}
 				}
 			}
-	}
+		}
 
 		free_job(job);  // if a foreground job, we no longer need the data
 		free(line);
